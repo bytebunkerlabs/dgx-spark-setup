@@ -70,4 +70,4 @@ cat <<EOF
   Logs:  $COMPOSE --profile ${ENGINE} logs -f
   Stop:  $COMPOSE --profile ${ENGINE} down
 EOF
-log "Next: ./setup.sh rag   (pgvector for RAG)   then   ./setup.sh monitoring"
+log "Next: dgxsetup rag   (pgvector for RAG)   then   dgxsetup monitoring"

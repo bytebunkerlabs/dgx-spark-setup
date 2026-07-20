@@ -87,4 +87,4 @@ fi
 
 echo
 ok "Hardening complete."
-log "Next: ./setup.sh models   (HF cache + pull embedding/test models)"
+log "Next: dgxsetup models   (HF cache + pull embedding/test models)"

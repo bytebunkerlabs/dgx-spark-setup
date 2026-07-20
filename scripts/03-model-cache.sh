@@ -45,4 +45,4 @@ echo
 ok "Model cache ready."
 log "HF cache:     ${HF_HOME}"
 log "Ollama store: ${OLLAMA_MODELS}"
-log "Next: ./setup.sh inference   (serve ${PRIMARY_MODEL} + LiteLLM gateway + Open WebUI)"
+log "Next: dgxsetup inference   (serve ${PRIMARY_MODEL} + LiteLLM gateway + Open WebUI)"

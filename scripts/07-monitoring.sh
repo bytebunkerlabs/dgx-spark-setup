@@ -40,4 +40,4 @@ cat <<EOF
 
   Reach remotely:  tailscale serve --bg --https=443 ${GRAFANA_PORT}
 EOF
-log "Next: ./setup.sh thermal   (standalone CSV logger for controlled test runs)"
+log "Next: dgxsetup thermal   (standalone CSV logger for controlled test runs)"

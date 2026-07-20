@@ -50,4 +50,4 @@ cat <<EOF
 
   Stop: $COMPOSE down     (add -v to also wipe the data volume)
 EOF
-log "Next: ./setup.sh finetune   or   ./setup.sh monitoring"
+log "Next: dgxsetup finetune   or   dgxsetup monitoring"

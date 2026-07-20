@@ -65,4 +65,4 @@ ok "Installed helpers: spark-gpu, spark-flush-cache, spark-health"
 echo
 ok "Host setup complete."
 warn "If you were just added to the docker group, start a new shell before continuing."
-log "Next: ./setup.sh security   (hardening + Tailscale)"
+log "Next: dgxsetup security   (hardening + Tailscale)"

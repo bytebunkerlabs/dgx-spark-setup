@@ -80,4 +80,4 @@ cat <<EOF
 
   Cheap-mistakes note: since it's all local, iterate freely — no per-token cost.
 EOF
-log "Next: ./setup.sh monitoring   (dashboards + GPU telemetry)"
+log "Next: dgxsetup monitoring   (dashboards + GPU telemetry)"

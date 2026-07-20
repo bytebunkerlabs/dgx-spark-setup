@@ -11,12 +11,12 @@
 # entire multi-Spark OS-setup section is skipped — the link is done.
 #
 # Subcommands:
-#   ./setup.sh cluster-serve setup          clone the repo + generate its config + preflight
-#   ./setup.sh cluster-serve start          launch the pooled model, health-check the endpoint
-#   ./setup.sh cluster-serve status         is the cluster up? which model?
-#   ./setup.sh cluster-serve logs           tail the cluster/vLLM logs
-#   ./setup.sh cluster-serve stop           tear the cluster down
-#   ./setup.sh cluster-serve sync-gateway   re-point LiteLLM's 'big' route at the current BIG_MODEL
+#   dgxsetup cluster-serve setup          clone the repo + generate its config + preflight
+#   dgxsetup cluster-serve start          launch the pooled model, health-check the endpoint
+#   dgxsetup cluster-serve status         is the cluster up? which model?
+#   dgxsetup cluster-serve logs           tail the cluster/vLLM logs
+#   dgxsetup cluster-serve stop           tear the cluster down
+#   dgxsetup cluster-serve sync-gateway   re-point LiteLLM's 'big' route at the current BIG_MODEL
 #
 # MEMORY: a big TP model at ${BIG_GPU_MEM_UTIL} util claims most of both boxes'
 # 128 GB. You cannot also hold the single-node fast model on the head at the same
@@ -37,7 +37,7 @@ preflight() {
   if ping -c1 -W2 "${CLUSTER_PEER_IP}" >/dev/null 2>&1; then
     ok "Fabric up: peer ${CLUSTER_PEER_IP} reachable (this is the NCCL/RDMA path)."
   else
-    err "Peer ${CLUSTER_PEER_IP} not reachable — run './setup.sh cluster stage' on both nodes first."; ok=0
+    err "Peer ${CLUSTER_PEER_IP} not reachable — run 'dgxsetup cluster stage' on both nodes first."; ok=0
   fi
   # head -> worker passwordless SSH? (the repo SSHes from head to worker)
   if [[ -n "${CLUSTER_WORKER_MGMT}" ]]; then
@@ -89,12 +89,12 @@ setup() {
   warn "    sudo mkdir -p /raid && sudo ln -sfn ${HF_HOME} /raid/hf-cache"
   warn "Container: it uses the NGC image nvcr.io/nvidia/vllm:* — if the pull 401s,"
   warn "    run 'docker login nvcr.io' with a free NGC API key."
-  log "Next: ./setup.sh cluster-serve start"
+  log "Next: dgxsetup cluster-serve start"
 }
 
 start() {
   step "Launch pooled model: ${BIG_MODEL} (TP=${BIG_TP}) across both Sparks"
-  [[ -d "$VENDOR" ]] || die "Not set up yet. Run: ./setup.sh cluster-serve setup"
+  [[ -d "$VENDOR" ]] || die "Not set up yet. Run: dgxsetup cluster-serve setup"
   gen_config                       # refresh in case .env changed
   preflight || die "Preflight failed — see errors above."
 
@@ -114,7 +114,7 @@ start() {
       break
     fi
     sleep 10
-    [[ $i -eq 120 ]] && warn "Not healthy yet — big TP loads can take a while. Watch: ./setup.sh cluster-serve logs"
+    [[ $i -eq 120 ]] && warn "Not healthy yet — big TP loads can take a while. Watch: dgxsetup cluster-serve logs"
   done
 
   echo
@@ -129,7 +129,7 @@ start() {
 
   Your apps: just ask for model "big" instead of "primary".
   If the gateway 404s on 'big', the model name changed — run:
-    ./setup.sh cluster-serve sync-gateway
+    dgxsetup cluster-serve sync-gateway
 EOF
 }
 
@@ -152,7 +152,7 @@ logs() {
     docker exec ray-head tail -n 120 -f /var/log/vllm.log 2>/dev/null \
       || docker logs -f ray-head
   else
-    warn "ray-head container not running. Start with: ./setup.sh cluster-serve start"
+    warn "ray-head container not running. Start with: dgxsetup cluster-serve start"
   fi
 }
 
@@ -160,7 +160,7 @@ stop() {
   step "Stop the pooled cluster"
   [[ -d "$VENDOR" ]] || die "Not set up yet."
   ( cd "$VENDOR" && ./stop_cluster.sh ) && ok "Cluster stopped (head + workers)."
-  log "Port ${BIG_PORT} is free again — you can bring the single-node fast engine back with ./setup.sh inference"
+  log "Port ${BIG_PORT} is free again — you can bring the single-node fast engine back with dgxsetup inference"
 }
 
 sync_gateway() {

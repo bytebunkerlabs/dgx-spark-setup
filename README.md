@@ -6,26 +6,27 @@ a fine-tuning workspace, full GPU/thermal observability, and a staged two-Spark
 cluster — built so your agents point at one endpoint, your RAG store has a local
 vector store, and you can fine-tune and break things at zero marginal cost.
 
-Everything is re-runnable. Nothing here reinstalls the driver/CUDA (that fights
+Everything is re-runnable. ( is a thin launcher for  — they are interchangeable.) Nothing here reinstalls the driver/CUDA (that fights
 the DGX OS bundle); the supported path is NGC containers, which is what this uses.
 
 ## Quick start
 
 ```bash
+./install.sh              # puts the dgxsetup command on your PATH (once)
 cp .env.example .env      # then EDIT: HF_TOKEN, passwords, model, cluster IPs
-./setup.sh preflight      # read-only sanity check of the box
-./setup.sh system         # docker group, tooling, dirs   (new shell after this)
-./setup.sh security       # ufw + fail2ban + SSH + Tailscale
-./setup.sh models         # HF cache + embedding/test models
-./setup.sh inference      # serve model + LiteLLM gateway + Open WebUI
-./setup.sh rag            # pgvector for RAG
-./setup.sh monitoring     # Prometheus + Grafana + nvidia-smi GPU exporter
-./setup.sh finetune       # LoRA/QLoRA workspace
-./setup.sh cluster detect # QSFP/RDMA discovery (stage/validate when cable lands)
-./setup.sh health         # is everything up?
+dgxsetup preflight      # read-only sanity check of the box
+dgxsetup system         # docker group, tooling, dirs   (new shell after this)
+dgxsetup security       # ufw + fail2ban + SSH + Tailscale
+dgxsetup models         # HF cache + embedding/test models
+dgxsetup inference      # serve model + LiteLLM gateway + Open WebUI
+dgxsetup rag            # pgvector for RAG
+dgxsetup monitoring     # Prometheus + Grafana + nvidia-smi GPU exporter
+dgxsetup finetune       # LoRA/QLoRA workspace
+dgxsetup cluster detect # QSFP/RDMA discovery (stage/validate when cable lands)
+dgxsetup health         # is everything up?
 ```
 
-`./setup.sh all` runs the base stack (preflight → system → security → models →
+`dgxsetup all` runs the base stack (preflight → system → security → models →
 inference → rag → monitoring) in order.
 
 ## The gotchas this repo already handles (read these once)
@@ -80,12 +81,12 @@ with the parallelism strategy as a dial and `bench/bench.py` (zero-dependency)
 measuring throughput / latency / TTFT so *your* numbers decide.
 
 ```bash
-./setup.sh multinode ray-up            # Ray head (this box) + worker (peer), NCCL pinned to RoCE
-./setup.sh multinode serve pp          # launch BIG_MODEL pipeline-parallel (or: serve tp)
-./setup.sh multinode bench pp          # one load test against the live endpoint
-./setup.sh multinode compare           # serve TP → bench → serve PP → bench, side-by-side table
-./setup.sh multinode boundaries pp     # sweep concurrency + context length until it breaks
-./setup.sh multinode ray-down          # tear the cluster down, free the port
+dgxsetup multinode ray-up            # Ray head (this box) + worker (peer), NCCL pinned to RoCE
+dgxsetup multinode serve pp          # launch BIG_MODEL pipeline-parallel (or: serve tp)
+dgxsetup multinode bench pp          # one load test against the live endpoint
+dgxsetup multinode compare           # serve TP → bench → serve PP → bench, side-by-side table
+dgxsetup multinode boundaries pp     # sweep concurrency + context length until it breaks
+dgxsetup multinode ray-down          # tear the cluster down, free the port
 ```
 
 What each topology is testing: `tp` splits every layer across both GPUs (all-reduce
@@ -104,7 +105,7 @@ Two serving modes now live in the gateway, and they're **mutually exclusive on
 memory** — a big tensor-parallel model claims most of both boxes' 128 GB, so you
 can't hold it *and* the single-node fast model on the head at once:
 
-- **fast** — single-node engine (`./setup.sh inference`), served as gateway model
+- **fast** — single-node engine (`dgxsetup inference`), served as gateway model
   `primary`, on host port `INFER_PORT` (default now `8001`).
 - **big** — one large model split across BOTH Sparks via tensor parallelism,
   served as gateway model `big`, on host port `BIG_PORT` (default `8000`).
@@ -115,10 +116,10 @@ with `09-cluster.sh`, that repo's entire OS-setup section is skipped.
 
 ```bash
 # one-time: set CLUSTER_WORKER_MGMT (worker's LAN/Tailscale IP) + BIG_MODEL in .env, then
-./setup.sh cluster-serve setup     # clone repo, generate its config, preflight (SSH/fabric/HF)
-./setup.sh cluster-serve start     # launch the pooled model; exposes it as gateway model 'big'
-./setup.sh cluster-serve status    # up? which model?
-./setup.sh cluster-serve stop      # frees :8000 for the fast engine again
+dgxsetup cluster-serve setup     # clone repo, generate its config, preflight (SSH/fabric/HF)
+dgxsetup cluster-serve start     # launch the pooled model; exposes it as gateway model 'big'
+dgxsetup cluster-serve status    # up? which model?
+dgxsetup cluster-serve stop      # frees :8000 for the fast engine again
 ```
 
 Prereqs the launcher checks for you: peer reachable (fabric up), **passwordless
@@ -126,7 +127,7 @@ SSH from head→worker** (`ssh-copy-id <user>@<worker>`), and `HF_TOKEN`. Two ma
 notes it prints: symlink `/raid/hf-cache → $HF_HOME` to reuse downloads, and
 `docker login nvcr.io` if the NGC image pull 401s. Apps switch modes by asking the
 gateway for `"big"` vs `"primary"` — no code changes. If you change `BIG_MODEL`,
-run `./setup.sh cluster-serve sync-gateway` to re-point the `big` route.
+run `dgxsetup cluster-serve sync-gateway` to re-point the `big` route.
 
 ## Two-Spark cluster (when the MCP1650-V001E30 arrives)
 

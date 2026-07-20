@@ -14,14 +14,14 @@
 #           the link; micro-batching keeps both GPUs busy → high throughput.
 #
 # Subcommands:
-#   ./setup.sh multinode ray-up               start the Ray cluster (head + worker)
-#   ./setup.sh multinode serve tp|pp          launch the model with that topology
-#   ./setup.sh multinode bench [tp|pp]        one benchmark against the live endpoint
-#   ./setup.sh multinode compare              serve TP→bench→serve PP→bench, side by side
-#   ./setup.sh multinode boundaries tp|pp     sweep concurrency + context until it breaks
-#   ./setup.sh multinode status               what's running
-#   ./setup.sh multinode stop                 stop the vLLM server (keep Ray up)
-#   ./setup.sh multinode ray-down             tear the whole Ray cluster down
+#   dgxsetup multinode ray-up               start the Ray cluster (head + worker)
+#   dgxsetup multinode serve tp|pp          launch the model with that topology
+#   dgxsetup multinode bench [tp|pp]        one benchmark against the live endpoint
+#   dgxsetup multinode compare              serve TP→bench→serve PP→bench, side by side
+#   dgxsetup multinode boundaries tp|pp     sweep concurrency + context until it breaks
+#   dgxsetup multinode status               what's running
+#   dgxsetup multinode stop                 stop the vLLM server (keep Ray up)
+#   dgxsetup multinode ray-down             tear the whole Ray cluster down
 #
 # Prereqs (same as the cluster path): fabric up, passwordless SSH head→worker,
 # HF token, and the model present on BOTH nodes (serve rsyncs it for you).
@@ -50,7 +50,7 @@ nccl_env_args() {
 
 precheck() {
   [[ -n "${CLUSTER_WORKER_MGMT}" ]] || die "Set CLUSTER_WORKER_MGMT in .env (worker's LAN/Tailscale IP)."
-  ping -c1 -W2 "${CLUSTER_PEER_IP}" >/dev/null 2>&1 || die "Peer ${CLUSTER_PEER_IP} unreachable — stage the fabric first (./setup.sh cluster stage)."
+  ping -c1 -W2 "${CLUSTER_PEER_IP}" >/dev/null 2>&1 || die "Peer ${CLUSTER_PEER_IP} unreachable — stage the fabric first (dgxsetup cluster stage)."
   ssh -o BatchMode=yes -o ConnectTimeout=5 "$WORKER" true 2>/dev/null || die "No passwordless SSH to $WORKER — run: ssh-copy-id $WORKER"
 }
 
@@ -98,7 +98,7 @@ serve() {
     *) die "topology must be 'tp' or 'pp'." ;;
   esac
   step "Serve ${BIG_MODEL} — topology=${topo^^} (TP=${tp} PP=${pp})"
-  docker ps --format '{{.Names}}' | grep -q '^ray-head$' || die "Ray not up. Run: ./setup.sh multinode ray-up"
+  docker ps --format '{{.Names}}' | grep -q '^ray-head$' || die "Ray not up. Run: dgxsetup multinode ray-up"
   sync_model
 
   docker exec ray-head pkill -f 'vllm serve' 2>/dev/null || true; sleep 2

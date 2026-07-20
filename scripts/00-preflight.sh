@@ -78,4 +78,4 @@ fi
 
 echo
 ok "Preflight complete. Nothing was modified."
-log "Next: cp .env.example .env  &&  edit it  &&  run ./setup.sh system"
+log "Next: cp .env.example .env  &&  edit it  &&  run dgxsetup system"

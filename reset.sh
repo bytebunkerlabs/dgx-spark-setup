@@ -89,9 +89,9 @@ manual_notes() {
   DGX Dashboard / recovery image, not this script.
 
   Start clean after reset:
-    ./setup.sh preflight            # recreates .env from template
+    dgxsetup preflight            # recreates .env from template
     # edit .env (HF_TOKEN, passwords), then:
-    ./setup.sh system && ./setup.sh security && ./setup.sh models && ./setup.sh inference
+    dgxsetup system && dgxsetup security && dgxsetup models && dgxsetup inference
 EOF
 }
 
