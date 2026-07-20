@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # setup.sh — orchestrator for the DGX Spark setup. Run ./install.sh once to get
-# the  command;  and  are the same thing.
+# the dgxsetup command; 'dgxsetup X' and './setup.sh X' are the same thing.
 # Run modules individually (recommended first time) or 'all' for the base stack.
 #
 #   dgxsetup preflight     # verify the box (read-only)   <- start here
