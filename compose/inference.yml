@@ -1,0 +1,134 @@
+# compose/inference.yml
+name: dgx-inference
+# Primary inference endpoint for your apps (agents, RAG generation).
+#
+# Architecture:
+#   [ your agents / RAG / code ] --> LiteLLM gateway (:4000, OpenAI-compatible)
+#                                            |
+#                             +--------------+--------------+
+#                             v                             v
+#                        vLLM or SGLang                 Ollama (host)
+#                        (primary model)                (quick models, embeddings)
+#
+# Security note: published ports bind to 127.0.0.1 ONLY. Docker rewrites iptables
+# and bypasses ufw, so publishing to 0.0.0.0 would expose these on your LAN
+# regardless of the firewall. Inter-service calls use the compose network
+# (e.g. http://vllm:8000), so loopback publishing loses you nothing. Reach them
+# from your laptop via `tailscale serve` or an SSH tunnel (see README).
+#
+# Pick ONE engine with a compose profile:
+#   docker compose -f compose/inference.yml --profile vllm   up -d
+#   docker compose -f compose/inference.yml --profile sglang up -d
+
+x-gpu: &gpu
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+
+services:
+  # ---- primary engine: vLLM -------------------------------------------------
+  vllm:
+    image: ${VLLM_IMAGE}
+    profiles: ["vllm"]
+    <<: *gpu
+    ipc: host                      # required for vLLM shared-memory tensor ops
+    restart: unless-stopped
+    ports: ["127.0.0.1:${INFER_PORT}:8000"]
+    volumes:
+      - ${HF_HOME}:/root/.cache/huggingface
+    environment:
+      HUGGING_FACE_HUB_TOKEN: ${HF_TOKEN}
+      # CONTINGENCY: if vLLM logs show a FlashInfer / sm_121 / KV-cache-sizing
+      # crash (happens when the image is on CUDA 12.8, below the sm_121 floor),
+      # uncomment the next line AND add --enforce-eager to the command below.
+      # Costs ~20-30% throughput, so only use it if the clean path crashes.
+      # VLLM_USE_FLASHINFER_SAMPLER: "0"
+    # The vllm/vllm-openai image entrypoint is `vllm serve`, which takes the
+    # model as a POSITIONAL arg (not --model). Pin both so it's version-proof.
+    entrypoint: ["vllm", "serve"]
+    command:
+      - ${PRIMARY_MODEL}
+      - --served-model-name
+      - ${SERVED_MODEL_NAME}
+      - --host
+      - "0.0.0.0"
+      - --port
+      - "8000"
+      - --max-model-len
+      - ${INFER_MAX_MODEL_LEN}
+      - --gpu-memory-utilization
+      - "0.90"
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "curl -sf http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 20
+      start_period: 300s          # first load can be slow while weights map in
+
+  # ---- primary engine: SGLang (alt) ----------------------------------------
+  sglang:
+    image: ${SGLANG_IMAGE}
+    profiles: ["sglang"]
+    <<: *gpu
+    ipc: host
+    restart: unless-stopped
+    ports: ["127.0.0.1:${INFER_PORT}:8000"]
+    volumes:
+      - ${HF_HOME}:/root/.cache/huggingface
+    environment:
+      HUGGING_FACE_HUB_TOKEN: ${HF_TOKEN}
+    # SGLang supports EAGLE3 speculative decoding natively (~2x) — add
+    # --speculative-algorithm EAGLE3 with a matching draft model when ready.
+    command: >
+      python3 -m sglang.launch_server
+      --model-path ${PRIMARY_MODEL}
+      --served-model-name ${SERVED_MODEL_NAME}
+      --host 0.0.0.0 --port 8000
+      --context-length ${INFER_MAX_MODEL_LEN}
+    healthcheck:
+      test: ["CMD", "bash", "-lc", "curl -sf http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 20
+      start_period: 300s
+
+  # ---- OpenAI-compatible gateway (single front door + request logging) ------
+  litellm:
+    image: ${LITELLM_IMAGE}
+    profiles: ["vllm", "sglang"]
+    restart: unless-stopped
+    ports: ["127.0.0.1:${LITELLM_PORT}:4000"]
+    volumes:
+      - ../config/litellm.config.yaml:/app/config.yaml:ro
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      PRIMARY_ENGINE_URL: "http://${INFER_ENGINE}:8000/v1"
+      OLLAMA_URL: "http://host.docker.internal:11434"
+      # Pooled "big" model served by the cluster (10-cluster-serve.sh) on the HOST.
+      # BIG_MODEL_LITELLM is derived here so .env stays single-source (BIG_MODEL).
+      BIG_ENGINE_URL: "http://host.docker.internal:${BIG_PORT}/v1"
+      BIG_MODEL_LITELLM: "openai/${BIG_MODEL}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # lets the gateway reach host Ollama
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+
+  # ---- chat UI for eyeballing models ---------------------------------------
+  open-webui:
+    image: ${OPENWEBUI_IMAGE}
+    profiles: ["vllm", "sglang"]
+    restart: unless-stopped
+    ports: ["127.0.0.1:${OPENWEBUI_PORT}:8080"]
+    volumes:
+      - openwebui:/app/backend/data
+    environment:
+      OPENAI_API_BASE_URL: "http://litellm:4000/v1"
+      OPENAI_API_KEY: ${LITELLM_MASTER_KEY}
+      WEBUI_AUTH: "true"
+    depends_on: [litellm]
+
+volumes:
+  openwebui:

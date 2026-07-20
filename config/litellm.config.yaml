@@ -1,0 +1,43 @@
+# config/litellm.config.yaml
+# LiteLLM is your single OpenAI-compatible endpoint. Point your apps at
+#   http://<spark>:4000/v1   with the master key from .env.
+# It routes model names to backends and logs every request — handy for the same
+# audit-trail discipline you use on any production gateway.
+
+model_list:
+  # The big model served by vLLM/SGLang (env var set by compose).
+  - model_name: primary
+    litellm_params:
+      model: openai/primary
+      api_base: os.environ/PRIMARY_ENGINE_URL
+      api_key: "not-needed"          # local engine, no auth on the internal net
+
+  # The pooled "big" model: one large model split across BOTH Sparks by the
+  # cluster (10-cluster-serve.sh). Reaches the cluster head on the HOST via
+  # host.docker.internal. Requests only succeed while the cluster is running;
+  # if it's down, calls to 'big' error (expected) while 'primary' keeps working.
+  - model_name: big
+    litellm_params:
+      model: os.environ/BIG_MODEL_LITELLM
+      api_base: os.environ/BIG_ENGINE_URL
+      api_key: "not-needed"
+
+  # Quick/small models via the preinstalled host Ollama.
+  - model_name: llama3.2:3b
+    litellm_params:
+      model: ollama/llama3.2:3b
+      api_base: os.environ/OLLAMA_URL
+
+  # Embeddings for the RAG store (also via Ollama).
+  - model_name: nomic-embed-text
+    litellm_params:
+      model: ollama/nomic-embed-text
+      api_base: os.environ/OLLAMA_URL
+
+litellm_settings:
+  drop_params: true
+  # Set a log store later (Postgres) if you want persistent request logs:
+  # database_url: os.environ/DATABASE_URL
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

@@ -1,0 +1,27 @@
+# compose/rag.yml
+name: dgx-rag
+# Vector store for your RAG pipeline: Postgres 16 + pgvector.
+# Chosen over a bespoke vector DB because standard Postgres tooling applies
+# so the ops story (backups, auth, audit) is one you already own.
+# Loopback-published for the same docker/ufw reason as the inference stack.
+
+services:
+  pgvector:
+    image: ${PGVECTOR_IMAGE}
+    restart: unless-stopped
+    ports: ["127.0.0.1:${PG_PORT}:5432"]
+    environment:
+      POSTGRES_USER: ${PG_USER}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+      POSTGRES_DB: ${PG_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../config/rag-init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER} -d ${PG_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

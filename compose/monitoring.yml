@@ -1,0 +1,65 @@
+# compose/monitoring.yml
+name: dgx-monitoring
+# GPU + host telemetry -> Prometheus -> Grafana.
+#
+# NOTE: DCGM-exporter is deliberately NOT used. On GB10 it inherits NVML's
+# unified-memory blindness (empty/garbage metrics) and multiple Spark owners
+# couldn't get it running at all. We use an nvidia-smi-based exporter, which
+# reads the temp/power/clock/util fields that DO work on this box. Memory comes
+# from node-exporter (/proc/meminfo) — the real number on unified memory anyway.
+# Grafana is loopback-published; reach it via Tailscale/SSH (docker/ufw caveat).
+
+services:
+  nvidia-gpu-exporter:
+    image: ${GPU_EXPORTER_IMAGE}
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, utility]
+    ports: ["127.0.0.1:${GPU_EXPORTER_PORT}:9835"]
+    # Wraps nvidia-smi; exposes nvidia_smi_temperature_gpu,
+    # nvidia_smi_power_draw_watts, nvidia_smi_clocks_current_sm_clock, etc.
+
+  node-exporter:
+    image: ${NODE_EXPORTER_IMAGE}
+    restart: unless-stopped
+    pid: host
+    command:
+      - '--path.rootfs=/host'
+      - '--collector.thermal_zone'      # CPU/SoC thermal zones
+      - '--collector.hwmon'             # fan/temp sensors where exposed
+    volumes:
+      - '/:/host:ro,rslave'
+    ports: ["127.0.0.1:${NODE_EXPORTER_PORT}:9100"]
+
+  prometheus:
+    image: ${PROMETHEUS_IMAGE}
+    restart: unless-stopped
+    volumes:
+      - ../config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - promdata:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=90d'   # keep history for A/B cooling runs
+    ports: ["127.0.0.1:${PROMETHEUS_PORT}:9090"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: ${GRAFANA_IMAGE}
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafanadata:/var/lib/grafana
+    ports: ["127.0.0.1:${GRAFANA_PORT}:3000"]
+    depends_on: [prometheus]
+
+volumes:
+  promdata:
+  grafanadata:
