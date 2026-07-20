@@ -6,7 +6,7 @@ a fine-tuning workspace, full GPU/thermal observability, and a staged two-Spark
 cluster — built so your agents point at one endpoint, your RAG store has a local
 vector store, and you can fine-tune and break things at zero marginal cost.
 
-Everything is re-runnable. ( is a thin launcher for  — they are interchangeable.) Nothing here reinstalls the driver/CUDA (that fights
+Everything is re-runnable. (`dgxsetup` is a thin launcher for `./setup.sh` — they are interchangeable.) Nothing here reinstalls the driver/CUDA (that fights
 the DGX OS bundle); the supported path is NGC containers, which is what this uses.
 
 ## Quick start
