@@ -1,6 +1,6 @@
 # compose/inference.yml
 name: dgx-inference
-# Primary inference endpoint for your apps (agents, RAG generation).
+# Primary inference endpoint for your apps (your apps (agents, RAG generation)).
 #
 # Architecture:
 #   [ your agents / RAG / code ] --> LiteLLM gateway (:4000, OpenAI-compatible)
@@ -101,17 +101,18 @@ services:
     image: ${LITELLM_IMAGE}
     profiles: ["vllm", "sglang"]
     restart: unless-stopped
-    ports: ["127.0.0.1:${LITELLM_PORT}:4000"]
+    # Publish on BOTH loopback and the LAN. Binding only to the LAN address
+    # silently removes 127.0.0.1:4000, breaking anything local on this host.
+    # LITELLM_BIND must NOT be 127.0.0.1 or the two mappings collide.
+    ports:
+      - "127.0.0.1:${LITELLM_PORT}:4000"
+      - "${LITELLM_BIND}:${LITELLM_PORT}:4000"
     volumes:
       - ../config/litellm.config.yaml:/app/config.yaml:ro
     environment:
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
       PRIMARY_ENGINE_URL: "http://${INFER_ENGINE}:8000/v1"
       OLLAMA_URL: "http://host.docker.internal:11434"
-      # Pooled "big" model served by the cluster (10-cluster-serve.sh) on the HOST.
-      # BIG_MODEL_LITELLM is derived here so .env stays single-source (BIG_MODEL).
-      BIG_ENGINE_URL: "http://host.docker.internal:${BIG_PORT}/v1"
-      BIG_MODEL_LITELLM: "openai/${BIG_MODEL}"
     extra_hosts:
       - "host.docker.internal:host-gateway"   # lets the gateway reach host Ollama
     command: ["--config", "/app/config.yaml", "--port", "4000"]

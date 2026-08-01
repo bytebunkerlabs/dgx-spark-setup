@@ -30,8 +30,13 @@ services:
     pid: host
     command:
       - '--path.rootfs=/host'
-      - '--collector.thermal_zone'      # CPU/SoC thermal zones
-      - '--collector.hwmon'             # fan/temp sensors where exposed
+      # 2026-07-31: a default collector hangs on GB10 sysfs; scrapes piled up
+      # to the 40-request limit and every scrape 503'd. Minimal explicit set.
+      - '--collector.disable-defaults'
+      - '--collector.meminfo'
+      - '--collector.cpu'
+      - '--collector.stat'
+      - '--collector.loadavg'
     volumes:
       - '/:/host:ro,rslave'
     ports: ["127.0.0.1:${NODE_EXPORTER_PORT}:9100"]
