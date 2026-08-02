@@ -30,3 +30,13 @@ scrape_configs:
     static_configs:
       - targets: ['192.168.100.2:9835']
         labels: {node: spark-2}
+
+  # vLLM on the head node (host network, port 8888). 5s interval because the
+  # console uses rate() over a 20s window to tell "engine busy, output
+  # buffered by the tool parser" from "actually stalled" — 15s scrapes would
+  # leave that window with one sample.
+  - job_name: vllm
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['172.19.0.1:8888']
+        labels: {node: spark-1}

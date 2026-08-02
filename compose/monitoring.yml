@@ -53,6 +53,12 @@ services:
     ports: ["127.0.0.1:${PROMETHEUS_PORT}:9090"]
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # Second leg on the inference bridge: ufw only permits container->host
+    # traffic to vLLM (:8888) on that bridge, so the vllm scrape job targets
+    # 172.19.0.1 — the same path LiteLLM uses. Without this the scrape times
+    # out from the monitoring network. Applied live via docker network
+    # connect; this makes it survive a recreate.
+    networks: [default, inference]
 
   grafana:
     image: ${GRAFANA_IMAGE}
@@ -68,3 +74,8 @@ services:
 volumes:
   promdata:
   grafanadata:
+
+networks:
+  inference:
+    name: dgx-inference_default
+    external: true
