@@ -14,7 +14,15 @@ apt_ensure ufw fail2ban unattended-upgrades
 # Default deny inbound. Allow SSH. App ports are exposed ONLY over the Tailscale
 # interface by default, so your inference/gateway/Grafana aren't on the LAN.
 log "Configuring ufw (default deny in / allow out)"
-sudo_ ufw --force reset >/dev/null
+# Re-running this stage must never wipe rules added since (fabric rails,
+# Docker bridges, the rack monitor): that turns a rerun into an outage.
+# Start from a clean slate only on a box whose firewall was never enabled,
+# or when asked to with DGXSETUP_UFW_RESET=1. Everything below is additive.
+if sudo_ ufw status | grep -q "^Status: active" && [[ "${DGXSETUP_UFW_RESET:-0}" != "1" ]]; then
+  log "ufw already active: keeping its rules (DGXSETUP_UFW_RESET=1 to start over)"
+else
+  sudo_ ufw --force reset >/dev/null
+fi
 sudo_ ufw default deny incoming
 sudo_ ufw default allow outgoing
 sudo_ ufw allow OpenSSH
